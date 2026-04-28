@@ -1,0 +1,60 @@
+Zaman,Seviye,Olay
+11:44:20,ok,Sistem baslatildi. Kamera bekleniyor...
+11:44:30,ok,=== AMELIYAT BASLADI ===
+11:44:30,ok,"Baslangic aleti sayimi: {'hemostat': False, 'forceps': False, 'weitlaner': False, 'scalpel': False}"
+11:44:45,ai,"[AI] Surgery is active. All instruments (hemostat, forceps, weitlaner, scalpel) are currently on the table and not in active use, as indicated by their timers at zero frames. No instruments have been picked up yet, suggesting this is an early phase of the procedure."
+11:44:59,ok,Hemostat ele alindi (#1)
+11:44:59,warn,[UYARI] hemostat elden cikti ve gorunmuyor!
+11:44:59,info,Hemostat bırakıldı.
+11:45:01,ok,Hemostat ele alindi (#2)
+11:45:02,warn,[UYARI] hemostat elden cikti ve gorunmuyor!
+11:45:07,ai,"[AI] ### Surgical Environment Status
+
+**Procedure Status:**  
+- Surgery is **actively in progress**.
+
+**Instrument Readiness:**  
+All instruments are currently **on the surgical table** and **not in use**:
+- Hemostat: idle (0 frames in use)  
+- Forceps: idle (0 frames in use)  
+- Weitlaner retractor: idle (0 frames in use)  
+- Scalpel: idle (0 frames in use)
+
+**Usage Summary:**  
+No instruments have been picked or utilized yet during this procedure (all pick counts are 0).
+
+**Interpretation:**  
+The surgical field is currently prepared with all listed instruments staged and available. No active instrument manipulation is occurring at this moment. This state typically occurs during initial setup, between procedural steps, or during a pause while maintaining readiness. All tools are properly positioned and unused thus far in the operation."
+11:45:10,ok,Hemostat ele alindi (#3)
+11:45:10,warn,[UYARI] hemostat elden cikti ve gorunmuyor!
+11:45:16,ok,Hemostat ele alindi (#4)
+11:45:16,warn,[UYARI] hemostat elden cikti ve gorunmuyor!
+11:45:17,warn,[UYARI] hemostat elden cikti ve gorunmuyor!
+11:45:17,warn,[UYARI] hemostat elden cikti ve gorunmuyor!
+11:45:17,info,Hemostat bırakıldı.
+11:45:18,ok,Hemostat ele alindi (#5)
+11:45:19,warn,[UYARI] hemostat elden cikti ve gorunmuyor!
+11:45:19,warn,[UYARI] hemostat elden cikti ve gorunmuyor!
+11:45:22,ok,Hemostat ele alindi (#6)
+11:45:23,warn,[UYARI] hemostat elden cikti ve gorunmuyor!
+11:45:23,warn,[UYARI] hemostat elden cikti ve gorunmuyor!
+11:45:26,ok,Hemostat ele alindi (#7)
+11:45:26,info,Hemostat bırakıldı.
+11:45:26,ok,Hemostat ele alindi (#8)
+11:45:26,info,Hemostat bırakıldı.
+11:45:28,ai,"[AI] Surgery is active.  
+
+**Key observations:**  
+- **Hemostat:** Timer shows 4 frames of active use, but it is currently missing (not on table or in hand). It has been picked up twice.  
+- **Forceps, Weitlaner, Scalpel:** All are on the table, with no active timer and no recorded pick-ups.  
+
+**Interpretation:**  
+The hemostat is the only instrument that has been actively used during this session, but it is now unaccounted for (state: missing). The other instruments remain untouched and available."
+11:45:34,ai,"[AI] Based on the current data:
+*   The simulated surgical procedure is active.
+*   The **hemostat** is the only instrument in use at the moment. It has been actively held for 21 consecutive frames and has been picked up 5 separate times, indicating it is being frequently utilized.
+*   All other instruments—forceps, weitlaner, and scalpel—are currently idle and on the surgical table, with no recorded active use time or pick-ups in this session.
+
+**Interpretation:** The current focus appears to be on a task requiring the hemostat, such as clamping or blunt dissection. The surgical field is being prepared, with other instruments ready for subsequent steps."
+11:45:35,ok,=== AMELIYAT BITTI ===
+11:45:35,ok,Tum aletler dogrulandi. Eksik yok.
