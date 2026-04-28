@@ -1,194 +1,330 @@
-# Web Tabanlı Akıllı Cerrahi Asistan — 3 Kısımlı Teknik Rapor
+# Web Arayüzü Teknik Raporu — 3 Kısım
 
 **Proje:** Smart Surgical Assistant v3.0  
-**Dosyalar:** `server.py` · `index.html`  
+**Dosya:** `index.html`  
 **Üniversite:** Near East University — Bilgisayar Mühendisliği
 
 ---
 
-## KISIM 1 — Flask Backend Sunucusu (`server.py`)
+## KISIM 1 — HTML: Sayfa Yapısı ve DOM
 
-### 1.1 Genel Mimari
+### 1.1 Genel Düzen
 
-Tkinter masaüstü uygulaması tamamen kaldırılarak yerine bir **Flask web sunucusu** kuruldu. Uygulama iki katmana ayrıldı:
+`index.html` tek dosyada HTML, CSS ve JavaScript'i bir arada barındıran bir **Single Page Application (SPA)** yapısıdır. Sayfa aşağıdaki bölümlerden oluşur:
 
-- **Backend (`server.py`):** Kamera okuma, yapay zeka tespiti ve durum yönetimi.
-- **Frontend (`index.html`):** Tarayıcı üzerinden erişilen kullanıcı arayüzü.
+| Bölüm | Etiket / ID | Açıklama |
+|---|---|---|
+| Navigasyon | `<nav id="mainNav">` | Sabit üst çubuk — okul logosu + bölüm linkleri |
+| Hero | `<div class="hero">` | Tam ekran video arka planı, başlık, CTA butonları |
+| İstatistikler | `<section>` `.stats-row` | 4 animasyonlu sayaç kartı |
+| Özellikler | `<section id="features">` | 6 özellik kartı |
+| Canlı Demo | `<section id="demo">` | Kamera akışı + kontrol paneli |
+| Alet Galerisi | `<section id="tools">` | 16 alet chip'i |
+| AI Bölümü | `<section id="ai">` | DeepSeek açıklaması + yazma efektli rapor kartı |
+| Footer | `<footer>` | Üniversite bilgisi ve linkler |
 
-Bu sayede birden fazla kullanıcı aynı anda farklı cihazlardan sisteme bağlanabilir hale geldi.
+### 1.2 Hero Bölümü
 
-### 1.2 Kamera İşleme Döngüsü
+```html
+<div class="hero">
+  <video class="hero-video" src="ameliyat video.mp4" autoplay muted loop playsinline></video>
+  <div class="hero-overlay"></div>   <!-- gradient karartma -->
+  <div class="hero-content">        <!-- başlık + butonlar -->
+```
 
-Kamera işlemleri ana Flask thread'inden ayrı bir **daemon thread** üzerinde çalışır (`_process_loop`). Bu döngüde sırasıyla şu adımlar gerçekleştirilir:
+- Arka plana gerçek ameliyat videosu (`ameliyat video.mp4`) yerleştirildi; `opacity: 0.22` ve `filter: saturate(.5)` ile soluk gösterildi.
+- `hero-overlay` div'i `linear-gradient` ile altta tam opak bir geçiş sağlar, böylece alttaki içerik videoya karışmaz.
+- `hero-badge` içindeki yeşil nokta CSS `@keyframes blink` ile yanıp söner.
 
-1. `cv2.VideoCapture(0)` ile kameradan kare okunur.
-2. **MediaPipe Hand Landmarker** ile ellerin 21 anahtar noktası tespit edilir; her el için dikdörtgen sınır kutusu (padding=25 px) hesaplanır.
-3. **YOLOv8** modeli (`conf=0.35`) ile 16 cerrahi alet tanınır; en yüksek güven skorlu kutu seçilir.
-4. Her alet için el–alet örtüşme skoru (`_score`) hesaplanır:
+### 1.3 Canlı Demo Bölümü (Kamera + Kontrol Paneli)
 
-   ```
-   score = 0.40×containment + 0.30×center_in + 0.20×IoU + 0.10×proximity
-   ```
+Demo bölümü `demo-body` içinde **2 sütunlu grid** olarak kuruldu:
 
-5. 7 karelik kayan pencere (`held_history`) ile ani "false positive" hatalar yumuşatılır.
-6. Kare JPEG olarak sıkıştırılır (kalite=78) ve `_latest_jpeg` değişkenine yazılır.
+```
+┌─────────────────────────────┬──────────────────┐
+│  Kamera akışı (.demo-video) │  Kontrol paneli  │
+│  + HUD katmanı              │  (.demo-controls)│
+└─────────────────────────────┴──────────────────┘
+```
 
-### 1.3 Thread-Safe Durum Yönetimi
+**Kamera alanı 3 katmandan oluşur:**
 
-Tüm durum bilgisi `S` sözlüğünde tutulur ve `threading.Lock()` (`_lock`) ile korunur. JPEG tamponu ayrıca `_jpeg_lock` ile ayrı bir kilitle korunur; bu sayede kamera döngüsü ile HTTP istekleri birbirini bloke etmez.
+1. `<img id="liveStream">` — `/video_feed`'den MJPEG akışı.
+2. `.cam-placeholder` — Sunucu bağlantısı yokken gösterilen spinner ve yönlendirme mesajı.
+3. `.hud` (absolute, pointer-events: none) — FPS sayacı, "LIVE" etiketi, köşe çizgileri.
 
-### 1.4 REST API Uç Noktaları
+**Kontrol paneli 5 bloktan oluşur (yukarıdan aşağıya):**
+1. Ameliyat kontrolü (Start / End butonları + süre saati)
+2. Algılama hassasiyeti (slider + preset butonları)
+3. Alet durum listesi (`#toolList`)
+4. Olay logu (`#evtLog`)
+5. Excel dışa aktarım butonu
 
-| Endpoint | Metod | Açıklama |
-|---|:---:|---|
-| `/` | GET | `index.html` anasayfasını döndürür |
-| `/video_feed` | GET | MJPEG stream — sonsuz multipart/jpeg akışı |
-| `/api/state` | GET | Anlık tüm verileri JSON olarak döndürür |
-| `/api/start` | POST | Ameliyatı başlatır; timerları ve sayaçları sıfırlar |
-| `/api/end` | POST | Ameliyatı bitirir; eksik alet listesi ve geçen süreyi döndürür |
-| `/api/set_threshold` | POST | El–alet eşiğini günceller (0.05–0.90 arası, debounce 120 ms) |
-| `/api/config` | GET | Mevcut eşik değerini döndürür |
-| `/api/export_excel` | GET | Oturum raporunu `.xlsx` olarak tarayıcıya indirir |
+### 1.4 Alet Galerisi ve Tool Status — Dinamik DOM
 
-### 1.5 Graceful Fallback (Hata Toleransı)
+`#toolList` ve `#toolsGrid` içindeki tüm HTML, JavaScript tarafından çalışma zamanında oluşturulur; `index.html` içinde bu elemanlar için sabit HTML yoktur. Her alet satırı şu yapıya sahiptir:
 
-- YOLO modeli yüklenemezse `MODEL_OK = False` ile devam edilir; kamera akışı çalışmaya devam eder.
-- MediaPipe bulunamazsa veya `hand_landmarker.task` dosyası yoksa yalnızca YOLO ile çalışılır.
-- Kamera açılamazsa siyah ekrana "Camera not found!" mesajı yazdırılır; sunucu çökmez.
+```html
+<div class="tool-row" id="row-scalpel">
+  <div class="tool-dot"   id="dot-scalpel">   <!-- renk noktası -->
+  <div class="tool-name">Scalpel</div>
+  <div class="tool-bar-wrap">
+    <div class="tool-bar-fill" id="bar-scalpel">  <!-- ilerleme çubuğu -->
+  <div class="tool-badge"  id="badge-scalpel">    <!-- ON TABLE / IN HAND / MISSING -->
+  <div class="tool-time"   id="time-scalpel">     <!-- kullanım süresi -->
+  <div class="tool-score"  id="score-scalpel">    <!-- örtüşme skoru -->
+</div>
+```
 
-### 1.6 Excel Raporlama (Sunucu Taraflı)
+### 1.5 Sunucu Uyarı Banner'ı
 
-`/api/export_excel` endpoint'i `openpyxl` ile iki sayfalı bir Excel dosyası oluşturur:
+```html
+<div id="serverWarning">
+```
 
-- **Sayfa 1 (Tool Summary):** Her alet için kullanım süresi, kaç kez alındığı, mevcut durumu ve zaman aşımı uyarısı.
-- **Sayfa 2 (Event Log):** Tüm oturum olayları; renk kodlu (yeşil / sarı / kırmızı / cyan) satırlar.
-
-Dosya diske kaydedilmez; `io.BytesIO` tamponu üzerinden doğrudan tarayıcıya akıtılır.
+Sayfa `file://` protokolü ile açıldığında (sunucu çalışmıyorken) bu banner görünür hale gelir ve kullanıcıya `python server.py`'yi nasıl başlatacağını gösterir. Start / End / Excel butonları da otomatik olarak `disabled` yapılır.
 
 ---
 
-## KISIM 2 — Web Arayüzü: HTML ve CSS (`index.html`)
+## KISIM 2 — CSS: Tasarım Sistemi ve Animasyonlar
 
-### 2.1 Sayfa Yapısı
+### 2.1 Renk Paleti — CSS Custom Properties
 
-`index.html` tek bir dosyada hem HTML hem de CSS ve JavaScript barındırır. Sayfa şu bölümlerden oluşur:
-
-| Bölüm | ID / Klass | İçerik |
-|---|---|---|
-| Navigasyon | `#mainNav` | Sabit üst bar, okul logosu, bölüm linkleri |
-| Hero | `.hero` | Tam ekran video arka plan, başlık, CTA butonları |
-| İstatistikler | `.stats-row` | 4 animasyonlu sayaç kartı |
-| Özellikler | `#features` | 6 özellik kartı grid |
-| Canlı Demo | `#demo` | Kamera + kontrol paneli |
-| Alet Galerisi | `#tools` | 16 alet chip |
-| AI Bölümü | `#ai` | DeepSeek açıklaması + animasyonlu AI rapor kartı |
-| Footer | `footer` | Üniversite bilgisi |
-
-### 2.2 Tasarım Sistemi (CSS Custom Properties)
-
-Tüm renkler CSS değişkeni olarak tanımlandı; bu sayede tema değişikliği tek noktadan yapılabilir:
+Tüm renkler `:root` bloğunda değişken olarak tanımlandı:
 
 ```css
 :root {
-  --bg-dark: #0d1117;   --bg-panel: #161b22;  --bg-card: #1c2128;
-  --accent:  #58a6ff;   --green:    #3fb950;  --red:     #f85149;
-  --yellow:  #d29922;   --cyan:     #39d0d8;
+  --bg-dark:  #0d1117;   /* ana arka plan */
+  --bg-panel: #161b22;   /* panel arka planı */
+  --bg-card:  #1c2128;   /* kart arka planı */
+  --accent:   #58a6ff;   /* mavi vurgu */
+  --green:    #3fb950;   /* ON TABLE */
+  --red:      #f85149;   /* IN HAND */
+  --yellow:   #d29922;   /* MISSING */
+  --cyan:     #39d0d8;   /* FPS / zaman */
+  --text-dim: #8b949e;   /* soluk metin */
+  --text:     #e6edf3;   /* ana metin */
+  --border:   #30363d;   /* kenar çizgisi */
 }
 ```
 
-### 2.3 Animasyonlar
+Bu yapı sayesinde ileride tema değişikliği tek bir blok düzenlenerek yapılabilir.
+
+### 2.2 Animasyonlar
 
 | Animasyon | Tetikleyici | Efekt |
 |---|---|---|
-| `slideDown` | Sayfa yüklenince | Nav çubuğu yukarıdan kayar |
+| `slideDown` | Sayfa yüklenince | Nav çubuğu yukarıdan kayarak girer |
 | `fadeUp` | Sayfa yüklenince | Hero içeriği aşağıdan yukarı açılır |
-| `statIn` | Viewport'a girilince | İstatistik kartları scale-in ile belirir |
-| `cardIn` | Viewport'a girilince | Özellik ve alet kartları aşağıdan kayar |
-| `blink` | Sürekli | "LIVE" noktası ve yeşil durum noktası yanıp söner |
-| `bounce` | Sürekli | Hero'daki "Scroll down" aşağı sekme yapar |
-| `spin` | Sunucu bağlantısı yokken | Kamera alanındaki yükleniyor spinneri döner |
+| `statIn` | Viewport'a girilince | İstatistik kartları ölçek ile belirir |
+| `cardIn` | Viewport'a girilince | Özellik / alet kartları yukarı kayar |
+| `blink` | Sürekli | "LIVE" ve durum noktaları yanıp söner |
+| `bounce` | Sürekli | Hero'daki "Scroll down" oku sekme yapar |
+| `spin` | Sunucu yokken | Kamera alanındaki spinner döner |
 | `endPulse` | Ameliyat bitince | Kamera çerçevesi 3 kez kırmızı parlar |
 
-### 2.4 Responsive Tasarım
+**Örnek — `endPulse`:**
+```css
+@keyframes endPulse {
+  0%,100% { box-shadow: inset 0 0 40px rgba(248,81,73,.12); }
+  50%      { box-shadow: inset 0 0 80px rgba(248,81,73,.35); }
+}
+.surgery-ring.ending { animation: endPulse .55s ease 3; }
+```
 
-`max-width: 800px` medya sorgusunda:
-- `demo-body` tek sütuna düşer (kamera + kontrol alt alta).
-- AI grid tek sütuna düşer.
-- Nav linkleri gizlenir (sadece logo ve başlık kalır).
+### 2.3 Kart ve Panel Stilleri
 
-### 2.5 Kamera Görüntüsü ve HUD Katmanı
+- **`.feat-card`:** `transform: translateY(-4px)` ve mavi `box-shadow` ile hover efekti.
+- **`.tool-row`:** `background: rgba(88,166,255,.05)` hover rengi.
+- **`.btn-start-surgery`:** Aktifken `box-shadow: 0 0 18px rgba(63,185,80,.5)` yeşil ışıma.
+- **`.btn-end-surgery.armed`:** Kırmızıya dönüşerek `box-shadow` ile alarm görünümü alır.
 
-Kamera alanı üç katman halinde yapılandırıldı:
+### 2.4 HUD Köşe Çizgileri
 
-1. **`<img id="liveStream">`** — `/video_feed`'den gelen MJPEG akışını gösterir.
-2. **`.cam-placeholder`** — Sunucu bağlantısı yokken spinner ve yönlendirme mesajı gösterir.
-3. **`.hud`** (absolute konumlu) — FPS sayacı, "LIVE" etiketi, köşe çizgileri ve ameliyat durumu etiketi; pointer-events: none ile etkileşimi engellenmez.
+```css
+.hud-corner.tl { top:10px; left:10px;  border-width: 2px 0 0 2px; }
+.hud-corner.tr { top:10px; right:10px; border-width: 2px 2px 0 0; }
+.hud-corner.bl { bottom:10px; left:10px;  border-width: 0 0 2px 2px; }
+.hud-corner.br { bottom:10px; right:10px; border-width: 0 2px 2px 0; }
+```
 
-`surgery-ring` CSS sınıfı, ameliyat aktifken yeşil, bitişinde kırmızı çerçeve animasyonu yapar.
+Her köşeye sadece 2 kenarlık çizilerek klasik cerrahi izleme sistemlerindeki kamera HUD görünümü elde edildi.
 
-### 2.6 Demo Kontrol Paneli
+### 2.5 Hassasiyet Slider'ı
 
-Sağ panel aşağıdaki blokları içerir (yukarıdan aşağı):
+```css
+input[type="range"].sens-slider::-webkit-slider-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); transition: transform .15s;
+}
+input[type="range"].sens-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+```
 
-1. **Surgery Control** — Start/End butonları + `monospace` oturum saati.
-2. **Detection Sensitivity** — Slider (5–80 pct → 0.05–0.80) + gradyan dolum çubuğu + 4 ön ayar butonu (High 0.08 / Med-Lo 0.15 / Normal 0.20 / Strict 0.40).
-3. **Tool Status** — 16 alet satırı; her birinde durum noktası, rozet, süre ve örtüşme skoru.
-4. **Event Log** — Kaydırılabilir monospace log alanı.
-5. **Export Excel** — `.xlsx` raporu indirme butonu.
+Slider arka planında `linear-gradient(90deg, var(--green), var(--yellow), var(--red))` ile yeşilden kırmızıya geçen bir dolum çubuğu ve `var(--accent)` renkli bir marker çizgisi yer alır.
+
+### 2.6 Responsive Tasarım
+
+```css
+@media (max-width: 800px) {
+  .demo-body      { grid-template-columns: 1fr; }    /* kamera + kontrol alt alta */
+  .ai-grid        { grid-template-columns: 1fr; }    /* AI bölümü tek sütun */
+  .nav-links      { display: none; }                 /* menü linkleri gizlenir */
+}
+```
 
 ---
 
-## KISIM 3 — Web Arayüzü: JavaScript (`index.html`)
+## KISIM 3 — JavaScript: Etkileşim ve Veri Senkronizasyonu
 
 ### 3.1 Başlangıç — Alet Listesi ve Galeri Oluşturma
 
-Sayfa yüklendiğinde JavaScript, `TOOLS` dizisini dönerek hem kontrol panelindeki `#toolList` hem de `#tools` galerisi için HTML elemanlarını dinamik olarak oluşturur. Her alet için ID tabanlı erişim sağlanır (`dot-{id}`, `badge-{id}`, `time-{id}`, `bar-{id}`, `score-{id}`).
+```js
+const TOOLS = [
+  {id:"army_navy", icon:"🔧", label:"Army Navy"},
+  {id:"scalpel",   icon:"🔪", label:"Scalpel"},
+  // ... toplam 16 alet
+];
+```
 
-### 3.2 Intersection Observer (Scroll Animasyonu)
+Sayfa yüklendiğinde `TOOLS` dizisi döngüye alınarak hem `#toolList` hem de `#toolsGrid` DOM elemanları dinamik olarak oluşturulur. ID tabanlı (`dot-{id}`, `badge-{id}`, `time-{id}`) erişim sonradan hızlı güncelleme için kullanılır.
 
-`IntersectionObserver` ile `.feat-card`, `.stat-card` ve `.tool-chip` elemanları viewport'a girince `visible` sınıfı alır ve CSS animasyonu tetiklenir. İstatistik kartlarındaki sayılar 1200 ms'lik ease-in-quadratic eğrisiyle animasyonlu olarak hedef değere ulaşır.
+### 3.2 Sunucu Algılama ve Bağlantı Yönetimi
 
-### 3.3 Sunucu Bağlantı Yönetimi
+```js
+const IS_SERVER = window.location.protocol.startsWith('http');
+```
 
-`IS_SERVER` bayrağı (`window.location.protocol.startsWith('http')`) ile dosya:// üzerinden açılıp açılmadığı tespit edilir:
+- `IS_SERVER = false` ise butonlar devre dışı, uyarı banner'ı görünür hale gelir.
+- `IS_SERVER = true` ise sayfa açılışında `/api/config`'ten mevcut eşik çekilir; ardından `setInterval(pollState, 600)` ile döngü başlatılır.
 
-- **Sunucu yoksa:** Start/End/Excel butonları devre dışı bırakılır; sarı uyarı banner gösterilir.
-- **Sunucu varsa:** Sayfa açılışında `/api/config`'ten mevcut eşik değeri çekilir; ardından her 600 ms'de bir `/api/state` çağrılır.
+### 3.3 Durum Sorgulama Döngüsü (`pollState`)
 
-### 3.4 Durum Sorgulama Döngüsü (`pollState`)
+Her 600 ms'de `/api/state` sorgulanır. Gelen yanıt işlenerek:
 
-`setInterval(pollState, 600)` ile saniyede ~1.67 kez sunucu durumu sorgulanır:
+1. **FPS** — `#hudFps` güncellenir.
+2. **Ameliyat süresi** — `#surgeryTimer` `HH:MM:SS` formatında gösterilir.
+3. **Alet satırları** — `updateToolRow()` ile durum noktası, rozet, süre çubuğu ve örtüşme skoru güncellenir.
+4. **Event log** — `lastSeenEventId` takibi sayesinde yalnızca yeni olaylar eklenir; aynı satır iki kez görünmez.
 
-1. `/api/state` yanıtından FPS, ameliyat süresi ve alet verileri okunur.
-2. Her alet için `updateToolRow()` çağrılarak durum noktası, rozet, süre çubuğu ve örtüşme skoru güncellenir.
-3. Örtüşme skoru eşiğin üzerindeyse **yeşil (`.hot`)**, altındaysa **sarı (`.warm`)** renk uygulanır.
-4. Yalnızca son görülen ID'den büyük olaylar log'a eklenir (`lastSeenEventId` takibi); bu sayede aynı satır iki kez eklenmez.
+```js
+const newEvts = (data.events || []).filter(e => e.id > lastSeenEventId);
+newEvts.forEach(e => {
+  if (e.id > lastSeenEventId) lastSeenEventId = e.id;
+  // log satırı oluştur ve ekle
+});
+```
 
-### 3.5 Eşik (Sensitivity) Kontrolü
+### 3.4 Alet Satırı Güncelleme (`updateToolRow`)
 
-- **Slider** hareketiyle `onSliderMove()` çağrılır; `_syncThreshUI()` hem slider hem dolum çubuğunu hem de marker çizgisini günceller.
-- **Preset butonları** `applyPreset(pct)` ile aynı akışı tetikler ve aktif butonu işaretler.
-- Sunucuya gönderim **120 ms debounce** (`_threshTimer`) ile gerçekleşir; slider sürüklenirken gereksiz API çağrısı yapılmaz.
+```js
+function updateToolRow(id, state, timerFrames, picks, score, threshold) {
+  const s   = STATUS[state] || STATUS.on_table;
+  const sec = Math.floor(timerFrames / 10);
+  // renk noktası, rozet, süre çubuğu, skor güncelleme
+}
+```
 
-### 3.6 Excel Export
+Örtüşme skoru görselleştirmesi:
+- `score >= threshold` → `.tool-score.hot` → **yeşil**
+- `score > 0 && score < threshold` → `.tool-score.warm` → **sarı**
+- `score == 0` → `"—"` (alet görünmüyor)
 
-`exportExcel()`:
-1. `/api/export_excel`'e GET isteği atar.
-2. Yanıt `Blob` olarak alınır.
-3. Geçici `<a>` elemanı oluşturularak `URL.createObjectURL` ile tarayıcının indirme mekanizması tetiklenir.
-4. İşlem bittikten sonra `URL.revokeObjectURL` ile bellek temizlenir.
+### 3.5 Hassasiyet Slider Kontrolü
 
-### 3.7 AI Yazma Efekti
+```js
+function onSliderMove(val) {
+  _syncThreshUI(parseInt(val));
+  _pushThreshold(_currentThreshold);
+}
+```
 
-`typeAI()` fonksiyonu, `#aiTypedText` alanında 4 örnek AI raporunu sırayla karakter karakter yazar (her karakter 26 ms aralıkla). Bir mesaj tamamlandıktan 4.2 saniye sonra bir sonrakine geçer. Canlı AI yanıtları `/api/state` event log üzerinden gelir; bu animasyon sistemin ne yapabileceğini göstermek için gösterge amaçlıdır.
+Sunucuya gönderim **120 ms debounce** ile gerçekleşir; slider sürüklenirken her harekette API çağrısı yapılmaz:
+
+```js
+let _threshTimer = null;
+function _pushThreshold(val) {
+  clearTimeout(_threshTimer);
+  _threshTimer = setTimeout(async () => {
+    await fetch('/api/set_threshold', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({threshold: val})
+    });
+  }, 120);
+}
+```
+
+4 preset butonu (`applyPreset`) aynı akışı tetikler ve aktif butonu `.active-pre` sınıfıyla işaretler.
+
+### 3.6 Excel Dışa Aktarım
+
+```js
+async function exportExcel() {
+  const res  = await fetch('/api/export_excel');
+  const blob = await res.blob();
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = `surgical_report_${...}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);   // bellek temizlenir
+}
+```
+
+Dosya diske kaydedilmeden doğrudan tarayıcının indirme mekanizması tetiklenir.
+
+### 3.7 Animasyonlu Sayaçlar (IntersectionObserver)
+
+```js
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add("visible");
+    const num    = e.target.querySelector("[data-count]");
+    const target = +num.dataset.count;
+    const start  = performance.now();
+    const tick = now => {
+      const p = Math.min((now - start) / 1200, 1);
+      num.textContent = Math.round(p * p * target);     // ease-in-quadratic
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}, { threshold: 0.15 });
+```
+
+Elemanlar viewport'a %15 girince sayaç başlar; 1200 ms'lik ease-in-quadratic eğrisiyle hedefe ulaşır.
+
+### 3.8 AI Yazma Efekti
+
+```js
+const AI_MSGS = [
+  "Scalpel held for 47 seconds — 1.3× the average surgical duration...",
+  // ... 4 örnek mesaj
+];
+function typeAI() {
+  const el  = document.getElementById("aiTypedText");
+  const msg = AI_MSGS[aiIdx++ % AI_MSGS.length];
+  el.textContent = "";
+  let i = 0;
+  const iv = setInterval(() => {
+    el.textContent += msg[i++];
+    if (i >= msg.length) { clearInterval(iv); setTimeout(typeAI, 4200); }
+  }, 26);
+}
+```
+
+Her karakter 26 ms aralıkla yazılır; mesaj tamamlanınca 4.2 saniye beklenerek bir sonrakine geçilir.
 
 ---
 
 ## Özet Tablo
 
-| | Kısım 1 (Backend) | Kısım 2 (HTML/CSS) | Kısım 3 (JavaScript) |
+| | Kısım 1 — HTML | Kısım 2 — CSS | Kısım 3 — JavaScript |
 |---|---|---|---|
-| **Ana Dosya** | `server.py` | `index.html` | `index.html` |
-| **Sorumluluk** | Kamera, AI, API | Yapı ve görsel tasarım | Etkileşim ve veri senkronizasyonu |
-| **Temel Teknoloji** | Flask, OpenCV, YOLO, MediaPipe | CSS Variables, Flexbox/Grid, Keyframes | Fetch API, IntersectionObserver, Blob |
-| **Kritik Özellik** | Thread-safe `_lock` | Animasyonlu HUD katmanı | 600 ms polling + debounce |
+| **Konu** | Sayfa yapısı ve DOM | Görsel tasarım ve animasyonlar | Etkileşim ve veri senkronizasyonu |
+| **Kritik Özellik** | 3 katmanlı kamera alanı | `--css-custom-properties` tema sistemi | 600 ms polling + 120 ms debounce |
+| **Dinamik İçerik** | `#toolList`, `#toolsGrid` JS ile doldurulur | 8 `@keyframes` animasyonu | `updateToolRow`, `pollState`, `exportExcel` |
+| **Responsive** | `grid-template-columns` değişimleri | `@media (max-width: 800px)` | `IS_SERVER` bayrağı ile protokol tespiti |
