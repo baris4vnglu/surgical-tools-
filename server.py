@@ -54,7 +54,7 @@ except ImportError:
 
 # ── Constants ──────────────────────────────────────────────
 TOOLS = [
-    "army_navy","bulldog","castroviejo","clamp","forceps","frazier",
+    "army_navy","bulldog","castroviejo","forceps","frazier",
     "hemostat","iris","mayo_metz","needle","potts","richardson",
     "scalpel","towel_clip","weitlaner","yankauer",
 ]
