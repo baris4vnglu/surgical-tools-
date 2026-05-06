@@ -122,6 +122,10 @@ STATUS_BGR = {
 def _process_loop():
     global _latest_jpeg
     cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FPS, 60)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     if not cap.isOpened():
         print("[ERROR] Cannot open camera (index 0)")
         import numpy as np
@@ -175,7 +179,7 @@ def _process_loop():
         detected_conf  = {}
         if MODEL_OK and model:
             try:
-                res = model(frame, conf=0.35, verbose=False)[0]
+                res = model(frame, conf=0.35, verbose=False, imgsz=416)[0]
                 for box in res.boxes:
                     c   = box.xyxy[0].tolist()
                     lbl = model.names[int(box.cls[0])].lower()
@@ -261,7 +265,7 @@ def _process_loop():
             cv2.line(frame,(px,py),(px+dx*SZ,py),(88,166,255),T)
             cv2.line(frame,(px,py),(px,py+dy*SZ),(88,166,255),T)
 
-        ok, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 78])
+        ok, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 65])
         if ok:
             with _jpeg_lock:
                 _latest_jpeg = buf.tobytes()
@@ -275,7 +279,7 @@ def _gen_frames():
             fb = _latest_jpeg
         if fb:
             yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + fb + b'\r\n'
-        time.sleep(0.033)
+        time.sleep(0.013)
 
 # ── Flask routes ───────────────────────────────────────────
 @app.route('/')
