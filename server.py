@@ -56,7 +56,7 @@ except ImportError:
 TOOLS = [
     "army_navy","bulldog","castroviejo","forceps","frazier",
     "hemostat","iris","mayo_metz","needle","potts","richardson",
-    "scalpel","towel_clip","weitlaner","yankauer",
+    "scalpel","towel_clip","weitlaner","yankauer","makas",
 ]
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

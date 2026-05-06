@@ -59,7 +59,7 @@ TOOLS = [
     "army_navy", "bulldog", "castroviejo",
     "forceps",   "frazier", "hemostat",   "iris",
     "mayo_metz", "needle",  "potts",      "richardson",
-    "scalpel",   "towel_clip", "weitlaner", "yankauer",
+    "scalpel",   "towel_clip", "weitlaner", "yankauer", "makas",
 ]
 
 # Voice alert threshold per tool (seconds)
