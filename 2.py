@@ -56,10 +56,10 @@ MODEL_PATH = r"C:\Users\baris\Downloads\best.pt"
 API_KEY    = os.getenv("OPENROUTER_API_KEY",
              "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")
 TOOLS = [
-    "army_navy", "bulldog", "castroviejo", "clamp",
+    "army_navy", "bulldog", "castroviejo",
     "forceps",   "frazier", "hemostat",   "iris",
     "mayo_metz", "needle",  "potts",      "richardson",
-    "scalpel",   "towel_clip", "weitlaner", "yankauer",
+    "scalpel",   "towel_clip", "weitlaner", "yankauer", "makas",
 ]
 
 # Voice alert threshold per tool (seconds)

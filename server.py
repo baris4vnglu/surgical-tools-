@@ -54,10 +54,18 @@ except ImportError:
 
 # ── Constants ──────────────────────────────────────────────
 TOOLS = [
-    "army_navy","bulldog","castroviejo","clamp","forceps","frazier",
+    "army_navy","bulldog","castroviejo","forceps","frazier",
     "hemostat","iris","mayo_metz","needle","potts","richardson",
-    "scalpel","towel_clip","weitlaner","yankauer",
+    "scalpel","towel_clip","weitlaner","yankauer","makas","scissors",
 ]
+
+# ── Camera source ──────────────────────────────────────────
+# USB webcam  →  CAMERA_SOURCE = 0
+# DroidCam    →  CAMERA_SOURCE = "http://192.168.x.x:4747/video"
+# IP Webcam   →  CAMERA_SOURCE = "http://192.168.x.x:8080/video"
+# RTSP        →  CAMERA_SOURCE = "rtsp://user:pass@192.168.x.x:554/stream"
+_raw = os.getenv("CAMERA_SOURCE", "0")
+CAMERA_SOURCE = int(_raw) if _raw.isdigit() else _raw
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
@@ -121,9 +129,15 @@ STATUS_BGR = {
 # ── Camera processing thread ───────────────────────────────
 def _process_loop():
     global _latest_jpeg
-    cap = cv2.VideoCapture(0)
+    is_ipcam = isinstance(CAMERA_SOURCE, str)
+    cap = cv2.VideoCapture(CAMERA_SOURCE)
+    if not is_ipcam:
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FPS, 60)
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     if not cap.isOpened():
-        print("[ERROR] Cannot open camera (index 0)")
+        print(f"[ERROR] Cannot open camera: {CAMERA_SOURCE}")
         import numpy as np
         err = np.zeros((480,640,3), dtype='uint8')
         cv2.putText(err,"Camera not found!",(140,240),cv2.FONT_HERSHEY_SIMPLEX,1.2,(0,0,200),2)
@@ -175,7 +189,7 @@ def _process_loop():
         detected_conf  = {}
         if MODEL_OK and model:
             try:
-                res = model(frame, conf=0.35, verbose=False)[0]
+                res = model(frame, conf=0.35, verbose=False, imgsz=416)[0]
                 for box in res.boxes:
                     c   = box.xyxy[0].tolist()
                     lbl = model.names[int(box.cls[0])].lower()
@@ -261,7 +275,7 @@ def _process_loop():
             cv2.line(frame,(px,py),(px+dx*SZ,py),(88,166,255),T)
             cv2.line(frame,(px,py),(px,py+dy*SZ),(88,166,255),T)
 
-        ok, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 78])
+        ok, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 65])
         if ok:
             with _jpeg_lock:
                 _latest_jpeg = buf.tobytes()
@@ -275,7 +289,7 @@ def _gen_frames():
             fb = _latest_jpeg
         if fb:
             yield b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + fb + b'\r\n'
-        time.sleep(0.033)
+        time.sleep(0.013)
 
 # ── Flask routes ───────────────────────────────────────────
 @app.route('/')
@@ -512,6 +526,10 @@ if __name__ == '__main__':
     threading.Thread(target=_process_loop, daemon=True).start()
     print("\n" + "="*52)
     print("  Smart Surgical Assistant  |  Flask Server")
+    print(f"  Camera source : {CAMERA_SOURCE}")
     print("  Open in browser: http://localhost:5000")
+    print("  Tip: set CAMERA_SOURCE env var for IP cam")
+    print("  e.g. DroidCam  : http://192.168.x.x:4747/video")
+    print("  e.g. IP Webcam : http://192.168.x.x:8080/video")
     print("="*52 + "\n")
     app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
